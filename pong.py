@@ -1,4 +1,6 @@
+import pandas as pd
 import pygame
+from sklearn.neighbors import KNeighborsRegressor
 
 # Variables
 WIDTH = 1200
@@ -58,9 +60,8 @@ class Paddle:
                                      self.y - self.HEIGHT // 2,
                                      self.WIDTH, self.HEIGHT))
 
-    def update(self):
-        new_y = pygame.mouse.get_pos()[1]
-
+    def update(self, new_y):
+        # new_y = pygame.mouse.get_pos()[1]
         if new_y - self.HEIGHT // 2 > BORDER \
                 and new_y + self.HEIGHT // 2 < HEIGHT - BORDER:
             self.show(background_Colour)
@@ -69,7 +70,7 @@ class Paddle:
 
 
 # Create objects
-ball = Ball(WIDTH - Ball.RADIUS, HEIGHT // 2, - VELOCITY, - VELOCITY)
+ball = Ball(WIDTH - Ball.RADIUS - 20, HEIGHT // 2 - 20, - VELOCITY, - VELOCITY)
 
 # Draw the scenario
 pygame.init()
@@ -92,6 +93,21 @@ paddle.show(foreground_Colour)
 
 clock = pygame.time.Clock()  # controls the framerate of the game
 
+
+# machine learning data collection
+# sample = open("game.csv", "w")  # opens a file for writing
+# print("x,y,vx,vy,Paddle.y", file=sample)  # initial print to file
+pong = pd.read_csv('game.csv')
+pong = pong.drop_duplicates()
+
+X = pong.drop(columns="Paddle.y")
+y = pong['Paddle.y']
+
+clf = KNeighborsRegressor(n_neighbors=3)
+clf.fit(X, y)
+
+df = pd.DataFrame(columns=['x', 'y', 'vx', 'vy'])
+
 # superloop unless player clicks exit on OS gui
 while True:
     event = pygame.event.poll()
@@ -102,7 +118,15 @@ while True:
 
     pygame.display.flip()  # updates the screen
 
-    paddle.update()
+    # machine learning
+    # toPredict = df.append({'x': ball.x, 'y': ball.y, 'vx': ball.vx, 'vy': ball.vy}, ignore_index=True)
+    toPredict = pd.concat([df, pd.DataFrame([{'x': ball.x, 'y': ball.y, 'vx': ball.vx, 'vy': ball.vy}])], ignore_index=True)
+    shouldMove = clf.predict(toPredict)
+
+    paddle.update(shouldMove[0])
     ball.update()
+
+    # print("{}, {}, {}, {}, {}".format(ball.x, ball.y, ball.vx, ball.vy, paddle.y), file=sample) # prints data to file
+
 
 pygame.quit()  # won't work on macOS possibly
